@@ -4,134 +4,132 @@ import altair as alt
 from altair import datum
 import geopandas as gpd
 from vega_datasets import data
+from ipywidgets import widgets
+from IPython.display import display
+
 
 df = pd.read_csv('world-data-2023_cleaned.csv')
 
 continent_color_scale = alt.Scale(
     domain=['Asia', 'Europe', 'Africa', 'Americas', 'Oceania'],
-    range=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
+    range=['#7570b3', '#66a61e', '#fdc086', '#e7298a', '#d95f02']
 )
 
 
 country_selection = alt.selection_point(
     fields=['country-code'],
-    empty=False
-    
-    # nearest=True
+    empty=False,
+
 )
 
-
+hover = alt.selection_point(on='pointerover', empty=False, nearest=True)
 
 continent_selection = alt.selection_point(
     fields=['region'],
-    nearest=True
+    # nearest=True
 )
 
 brush_selection = alt.selection_interval(
-    encodings=['x', 'y']
-)
+    mark=alt.BrushConfig(cursor='zoom-in', fill='#737070', fillOpacity=0.2, stroke='black', strokeWidth=1),
+    
+)  
 
 
-# Update legend chart
+
 legend = alt.Chart(df).transform_aggregate(
     groupby=['region']
-).mark_point(size=100).encode(
+).mark_point().encode(
     y=alt.Y('region:N', axis=alt.Axis(title=None, labelAngle=-90)),
     color=alt.Color('region:N', scale=continent_color_scale, legend=None),
     opacity=alt.condition(continent_selection & brush_selection, alt.value(1), alt.value(0.2)),
     fill=alt.Color('region:N', scale=continent_color_scale, legend=None),
-    fillOpacity=alt.condition(country_selection & brush_selection, alt.value(0.8), alt.value(0.2))
+    fillOpacity=alt.condition(continent_selection & brush_selection, alt.value(0.8), alt.value(0.2)),
+    size=alt.condition( hover, alt.value(300), alt.value(150)),
 ).add_params(
-    continent_selection, brush_selection
+    continent_selection, brush_selection, hover
 ).properties(
     title='Continent'
 )
 
 sphere = alt.sphere()
 graticule = alt.graticule()
-# Layering and configuring the components
 basemap = (
     alt.layer(
         #sphere background
-        alt.Chart(sphere).mark_geoshape(fill='white'),
+        alt.Chart(sphere).mark_geoshape(fill='lightblue'),
         #add meridians and parallels (graticules)
         alt.Chart(graticule).mark_geoshape(stroke='gray', strokeWidth=0.5),
     )   
 )
 
-
-
-
-# # Add continent borders
-# continent_borders = alt.Chart(continent_map).mark_geoshape(
-#     # stroke='black',  # Color of the continent borders
-#     # strokeWidth=1.5,  # Thickness of the borders
-#     # fillOpacity=0  # Ensure the fill is transparent
-# ).transform_lookup(
-#     lookup='id',
-#     from_=alt.LookupData(
-#         df,
-#         'country-code',
-#         ['region']  # Ensure the continent (region) data is included
-#     )
-# ).encode(
-#     stroke=alt.condition(
-#     continent_selection,
-#     alt.Color('region:N'),
-#     alt.value('lightgray')
-# )
-# ).project(
-#     type='equalEarth'
-# )
-
-
-
-world_map = alt.topo_feature(data.world_110m.url, 'countries')
-
 color_scheme = 'viridis'
 
-projection_list = ['GDP per Capita', 'Life expectancy', 'CO2 Emissions per Capita', ]
-projection_select = alt.binding_select(options=projection_list, name='World Map Metric:')
-projection_param = alt.param(value='GDP per Capita', bind=projection_select)
+url = "https://naciscdn.org/naturalearth/110m/cultural/ne_110m_admin_0_countries.zip"
+country_shapes = gpd.read_file(url)
+country_shapes = country_shapes[['NAME', 'ISO_A3', 'geometry']]
+country_shapes['alpha-3'] = country_shapes['ISO_A3']
+
+map_data = pd.merge(country_shapes, df, on='alpha-3', how='left')
+
+map_data['highlight'] = False
+df['highlight'] = False
+
+selection_columns = ['GDP per Capita', 'Life expectancy', 'CO2 Emissions per Capita', 'Unemployment rate']
+selection_box = alt.binding_select(options=selection_columns, name='Select an Indicator')
+selection = alt.selection_point(fields=['Indicator'], bind=selection_box, value='GDP per Capita')
 
 
-choropleth = alt.Chart(world_map).mark_geoshape().encode(
-    color=alt.Color('GDP per Capita:Q',
-                 scale=alt.Scale(scheme=color_scheme),
-                 title='GDP per Capita'),
-    opacity=alt.condition(continent_selection & country_selection & brush_selection, alt.value(1), alt.value(0.3)),
+dropdown = widgets.Dropdown(
+    options=selection_columns,
+    value='GDP per Capita',  # Default value
+    description='Select Indicator:',
+    style={'description_width': 'initial'}
+)
+
+choropleth_map = alt.Chart(map_data, 
+    title=alt.Title("Choropleth map of country demographics",
+        subtitle="GDP per Capita by default, choose a different indicator from the dropdown menu at the bottom"
+)).transform_fold(
+    selection_columns,
+    as_=['Indicator', 'Value']
+).transform_filter(
+    selection    
+).mark_geoshape(
+    stroke='white',
+    strokeWidth=0.7
+).encode(
+    shape='geometry:G',
+    color=alt.Color('Value:Q',
+                   scale=alt.Scale(scheme=color_scheme),
+                   title='Selected Indicator'),
+    opacity=alt.condition(
+        continent_selection & country_selection & brush_selection,
+        alt.value(1),
+        alt.value(0.3)
+    ),
     tooltip=[
         alt.Tooltip('Country:N', title='Country'),
         alt.Tooltip('GDP per Capita:Q', title='GDP per Capita'),
         alt.Tooltip('Life expectancy:Q', title='Life Expectancy'),
-        alt.Tooltip('CO2 Emissions per Capita:Q', title='CO₂ Emissions per Capita')
+        alt.Tooltip('CO2 Emissions per Capita:Q', title='CO₂ Emissions per Capita'),
+        alt.Tooltip('Unemployment rate:Q', title='Unemployment Rate')
     ]
-).transform_lookup(
-    lookup='id',
-    from_=alt.LookupData(
-        df,
-        'country-code',
-        ['Country', 'GDP per Capita', 'Life expectancy', 'CO2 Emissions per Capita', 'country-code', 'region']
-    )
 ).project(
     type='equalEarth'
 ).add_params(
-    country_selection, brush_selection
+    country_selection, selection
 ).properties(
     width=900,
     height=540,
-    title='GDP per Capita across the World'
-) 
+    title='GDP per Capita across the World' 
+)
+
+final_map = basemap + choropleth_map 
 
 
+df_filtered = df[~df['Country'].isin(['Luxembourg', 'Liechtenstein'])] # removing because they are outliers
 
-
-final_map = basemap + choropleth 
-
-df_filtered = df[~df['Country'].isin(['Luxembourg', 'Liechtenstein'])]
-
-# Update scatter plot
-scatter_plot = alt.Chart(df_filtered).mark_point().encode(
+gdp_life_expectancy_scatter = alt.Chart(df_filtered).mark_point().encode(
     x=alt.X('GDP per Capita:Q', title='GDP per Capita'),
     y=alt.Y('Life expectancy:Q', title='Life Expectancy', scale=alt.Scale(domain=[df_filtered['Life expectancy'].min() - 5, df_filtered['Life expectancy'].max() + 5])),
     color=alt.Color( 'region:N', scale=continent_color_scale, legend=None),
@@ -139,7 +137,7 @@ scatter_plot = alt.Chart(df_filtered).mark_point().encode(
     fill=alt.Color('region:N', scale=continent_color_scale, legend=None),
     fillOpacity=alt.condition(country_selection & brush_selection, alt.value(0.6), alt.value(0.2)),
     size=alt.Size('Population:Q', legend=None, scale=alt.Scale(range=[100, 3000]), title='Population'),
-    order=alt.condition(country_selection, alt.value(1), alt.value(0)),
+    order=alt.condition(country_selection & continent_selection & brush_selection, alt.value(1), alt.value(0)),
     tooltip=[
         alt.Tooltip('Country:N', title='Country'),
         alt.Tooltip('GDP per Capita:Q', title='GDP per Capita'),
@@ -158,13 +156,11 @@ scatter_plot = alt.Chart(df_filtered).mark_point().encode(
 )
 
 continent_avg_co2 = df.groupby('region').agg({'CO2 Emissions per Capita': 'mean'}).reset_index()
-
-# Create bar chart for average CO2 emissions per continent
-avg_co2_bar = alt.Chart(continent_avg_co2).mark_bar().encode(
+average_co2_emissions_bar_chart = alt.Chart(continent_avg_co2).mark_bar().encode(
     y=alt.Y('region:N', axis=alt.Axis(title='Continent')),
     x=alt.X('CO2 Emissions per Capita:Q', axis=alt.Axis(title='Average CO₂ Emissions per Capita')),
     color=alt.value('grey'),
-    opacity=alt.condition(continent_selection & brush_selection, alt.value(0.4), alt.value(0.1)),
+    opacity=alt.condition(continent_selection, alt.value(0.4), alt.value(0.1)),
     tooltip=[
         alt.Tooltip('region:N', title='Continent'),
         alt.Tooltip('CO2 Emissions per Capita:Q', title='Average CO₂ Emissions per Capita')
@@ -172,36 +168,32 @@ avg_co2_bar = alt.Chart(continent_avg_co2).mark_bar().encode(
 ).properties(
     width=640,
     height=540
-).add_params(
-    continent_selection
 )
-
-# remove qatar, trinidad and tobago
+# removed qatar, trinidad and tobago as they are outliers
 df_filtered = df[~df['Country'].isin(['Qatar', 'Trinidad and Tobago'])]
 
-# Create scatter plot for individual country's CO2 emissions
-country_co2_scatter = alt.Chart(df_filtered).mark_point(size=100).encode(
+country_co2_scatter = alt.Chart(df_filtered).mark_point().encode(
     y=alt.Y('region:N', axis=alt.Axis(title='Continent')),
     x=alt.X('CO2 Emissions per Capita:Q', axis=alt.Axis(title='CO₂ Emissions per Capita')),
     color=alt.Color('region:N', scale=continent_color_scale, legend=None),
     fill=alt.Color('region:N', scale=continent_color_scale, legend=None),
     fillOpacity=alt.condition(country_selection & brush_selection, alt.value(0.6), alt.value(0.2)),
     opacity=alt.condition(country_selection & brush_selection, alt.value(1), alt.value(0.25)),
-    order=alt.condition(country_selection, alt.value(1), alt.value(0)),
+    order=alt.condition(country_selection & continent_selection & brush_selection, alt.value(1), alt.value(0)),
+    size=alt.when(hover).then(alt.value(500)).otherwise(alt.value(100)),
     tooltip=[
         alt.Tooltip('Country:N', title='Country'),
         alt.Tooltip('CO2 Emissions per Capita:Q', title='CO₂ Emissions per Capita'),
         alt.Tooltip('region:N', title='Continent')
     ]
 ).add_params(
-    country_selection, brush_selection
+    country_selection, brush_selection, hover
 ).transform_filter(
     continent_selection
 )
 
-# Overlay the scatter plot on top of the bar chart
 emissions_chart = alt.layer(
-    avg_co2_bar,
+    average_co2_emissions_bar_chart,
     country_co2_scatter
 ).resolve_scale(
     y='shared'
@@ -210,7 +202,6 @@ emissions_chart = alt.layer(
     height=540,
     title='CO₂ Emissions per Capita across Countries and Continents'
 )
-
 
 
 health_indicators = [
@@ -222,36 +213,43 @@ health_indicators = [
     'Out of pocket health expenditure'
 ]
 
+#  dropping any rows with missing values in the health indicators
 df_health = df.dropna(subset=health_indicators)
 
-parallel_data = df_health.melt(
-    id_vars=['Country', 'country-code', 'region'],
-    value_vars=health_indicators,
-    var_name='Indicator',
-    value_name='Value'
-)
-
-# Update parallel plot
-parallel_plot = alt.Chart(parallel_data).transform_joinaggregate(
+parallel_plot = alt.Chart(df_health).transform_window(
+    index='count()'
+).transform_fold(
+    health_indicators,
+    as_=['Indicator', 'Value']
+).transform_joinaggregate(
     min_value='min(Value)',
     max_value='max(Value)',
     groupby=['Indicator']
 ).transform_calculate(
     minmax_value='(datum.Value - datum.min_value) / (datum.max_value - datum.min_value)'
-).mark_line(opacity=0.5).encode(
+).mark_line().encode(
     x=alt.X('Indicator:N', title='Health Indicators', sort=health_indicators, axis=alt.Axis(labelAngle=-15)),
     y=alt.Y('minmax_value:Q', scale=alt.Scale(zero=False)),
     color=alt.Color('region:N', scale=continent_color_scale, legend=None),
-    opacity=alt.condition(country_selection & brush_selection, alt.value(0.8), alt.value(0.05)),
-    order=alt.condition(country_selection, alt.value(1), alt.value(0)),
-    detail='country-code:N',
+    opacity=alt.condition(
+        country_selection & brush_selection,
+        alt.value(0.8),
+        alt.value(0.05)
+    ),
+    order=alt.condition(
+        country_selection & brush_selection,
+        alt.value(1),
+        alt.value(0)
+    ),
+    detail='alpha-3:N',
     tooltip=[
         alt.Tooltip('Country:N'),
         alt.Tooltip('Indicator:N'),
         alt.Tooltip('Value:Q')
     ]
 ).add_params(
-    country_selection, brush_selection
+    country_selection,
+    brush_selection
 ).transform_filter(
     continent_selection
 ).properties(
@@ -261,16 +259,17 @@ parallel_plot = alt.Chart(parallel_data).transform_joinaggregate(
 )
 
 
+
+
+
 education_indicators = ['Gross primary education enrollment (%)', 'Gross tertiary education enrollment (%)']
 df_education = df.dropna(subset=education_indicators)
-
-# Calculate continent-wise average for education indicators
 continent_avg_education = df_education.groupby('region').agg({
     'Gross primary education enrollment (%)': 'mean',
     'Gross tertiary education enrollment (%)': 'mean'
 }).reset_index()
 
-# Melt the dataframe for stacked bar chart
+
 education_data = continent_avg_education.melt(
     id_vars=['region'],
     value_vars=education_indicators,
@@ -280,24 +279,23 @@ education_data = continent_avg_education.melt(
 
 
 
-
-
-
-# Create stacked bar chart for education rates
 education_bar = alt.Chart(education_data).mark_bar().encode(
     x=alt.X('Rate:Q', axis=alt.Axis(title='Average Education Rate')),
     y=alt.Y('region:N', sort='-x', axis=alt.Axis(title='Continent')),
     color=alt.Color('Rate:Q', legend=None),
     opacity=alt.condition(continent_selection, alt.value(0.4), alt.value(0.1)),
+    tooltip=[
+        alt.Tooltip('region:N', title='Continent'),
+        alt.Tooltip('Education Level:N', title='Education Level'),
+        alt.Tooltip('Rate:Q', title='Average Rate')
+    ]
 ).properties(
     width=640,
     height=540
 )
 
-# Filter out null values for unemployment rate
 df_unemployment = df.dropna(subset=['Unemployment rate'])
 
-# Create scatter plot for unemployment rate
 unemployment_scatter = alt.Chart(df_unemployment).mark_point(size=100).encode(
     y=alt.Y('region:N', axis=alt.Axis(title='Continent')),
     x=alt.X('Unemployment rate:Q', axis=alt.Axis(title='Unemployment Rate')),
@@ -305,21 +303,20 @@ unemployment_scatter = alt.Chart(df_unemployment).mark_point(size=100).encode(
     fill=alt.Color('region:N', scale=continent_color_scale, legend=None),
     fillOpacity=alt.condition(country_selection & brush_selection, alt.value(0.6), alt.value(0.2)),
     opacity=alt.condition(country_selection & brush_selection, alt.value(1), alt.value(0.25)),
-    order=alt.condition(country_selection, alt.value(1), alt.value(0)),
+    order=alt.condition(country_selection & continent_selection & brush_selection, alt.value(1), alt.value(0)),
+    size=alt.when(hover).then(alt.value(500)).otherwise(alt.value(100)),
     tooltip=[
         alt.Tooltip('Country:N', title='Country'),
         alt.Tooltip('Gross primary education enrollment (%):Q', title='Primary Education Enrollment percentage'),
         alt.Tooltip('Gross tertiary education enrollment (%):Q', title='Tertiary Education Enrollment percentage'),
-        alt.Tooltip('Unemployment rate:Q', title='Unemployment Rate'),
-        # alt.Tooltip('region:N', title='Continent')
+        alt.Tooltip('Unemployment rate:Q', title='Unemployment Rate (%)'),
     ]
 ).add_params(
-    country_selection, brush_selection
+    country_selection, brush_selection, hover
 ).transform_filter(
     continent_selection
 )
 
-# Combine the bar chart and scatter plot
 education_unemployment_chart = alt.layer(
     education_bar,
     unemployment_scatter
@@ -331,26 +328,31 @@ education_unemployment_chart = alt.layer(
     title='Education and Unemployment in Countries and Continents' 
 )
 
-# Filter the data based on the selected country
+
+indicators = ['Country', 'Population', 'GDP per Capita', 'Gross primary education enrollment (%)', 'Gross tertiary education enrollment (%)', \
+                'Unemployment rate', 'CO2 Emissions per Capita', 'Life expectancy', 'Physicians per thousand', 'Fertility Rate', 'Infant mortality', \
+                    'Maternal mortality ratio', 'Out of pocket health expenditure']
+
 selected_data = alt.Chart(df).transform_filter(
     country_selection
 ).transform_fold(
-    ['Country', 'GDP per Capita', 'Life expectancy', 'CO2 Emissions per Capita', 'Population', 'Unemployment rate', 'CPI'], 
+    indicators,
     as_=['Indicator', 'Value']
-).mark_text().encode(
-    y=alt.Y('Indicator:N', axis=alt.Axis(title=None, labelAngle=-75)),
+).mark_text(align='left').encode(
+    y=alt.Y('Indicator:N', sort=indicators, axis=alt.Axis(title=None)),
     text=alt.Text('Value:N')
 ).properties(
     width=120,
     height=540,
-    title='Country Statistics'
+    title='Country Statistics',
 )
 
 
 top_row = alt.hconcat(
-    final_map.properties(width=900, height=540),
-    selected_data.properties(width=120, height=540),
-    parallel_plot.properties(width=900, height=540)
+    final_map.properties(width=850, height=540),
+    parallel_plot.properties(width=800, height=540),
+    selected_data.properties(width=150, height=540)
+    
 ).resolve_scale(
     color='independent'
 )
@@ -358,9 +360,10 @@ top_row = alt.hconcat(
 
 bottom_row = alt.hconcat(
     legend.properties(width=80, height=250),
-    emissions_chart.properties(width=640, height=540),
-    scatter_plot.properties(width=560, height=540),    
-    education_unemployment_chart.properties(width=640, height=540),
+    education_unemployment_chart.properties(width=640, height=530),
+    emissions_chart.properties(width=640, height=530),
+    gdp_life_expectancy_scatter.properties(width=560, height=530)    
+    
 ).resolve_scale(
     color='independent'
 )

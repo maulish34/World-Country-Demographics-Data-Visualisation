@@ -1,0 +1,79 @@
+1. Clicking on the bar charts is making the program think that it has selected a country but 
+    actually it hasnt and then makes all the points light in colour
+
+2. Continent legend get big in size while hovering over the bars and doesn't return to normal size then after
+
+3. PCP minmax issue
+
+4. alt.Title in the choropleth not working : https://altair-viz.github.io/user_guide/customization.html#adjusting-the-title
+
+5. Remove margin in the statistic display table
+
+6. how to use custom colour scheme
+
+7. I used colorbrewer for colour schemes but I am not satisfied with it. I am unable to find suitable colours that are also colourblind and print friendly.
+
+8. brish selection if it touchesd the continent bars, it ends up selecting countries in that range too
+
+9. dynamically changing size with country selection is not working
+
+10, Should i remmove life expectancy from the PCP?
+
+11. can i have the notebook and python file in the folder? what about the extra dataset and the geojson files folder too?
+
+# health_indicators = [
+#     'Physicians per thousand',
+#     'Life expectancy',
+#     'Fertility Rate',
+#     'Infant mortality',
+#     'Maternal mortality ratio',
+#     'Out of pocket health expenditure'
+# ]
+
+# df_health = df.dropna(subset=health_indicators)
+
+# parallel_data = df_health.melt(
+#     id_vars=['Country', 'country-code', 'region', 'alpha-3'],
+#     value_vars=health_indicators,
+#     var_name='Indicator',
+#     value_name='Value'
+# )
+
+# # parallel_data['highlight']= False
+
+# parallel_plot = alt.Chart(parallel_data).transform_joinaggregate(
+#     min_value='min(Value)',
+#     max_value='max(Value)',
+#     groupby=['Indicator']
+# ).transform_calculate(
+#     minmax_value='(datum.Value - datum.min_value) / (datum.max_value - datum.min_value)'
+# ).mark_line().encode(
+#     x=alt.X('Indicator:N', title='Health Indicators', sort=health_indicators, axis=alt.Axis(labelAngle=-15)),
+#     y=alt.Y('minmax_value:Q', scale=alt.Scale(zero=False)),
+#     color=alt.Color('region:N', scale=continent_color_scale, legend=None),
+#     opacity=alt.condition(
+#         country_selection & brush_selection,
+#         alt.value(0.8),
+#         alt.value(0.05)
+#     ),
+#     order=alt.condition(
+#         country_selection & brush_selection,
+#         alt.value(1),
+#         alt.value(0)
+#     ),
+#     detail='alpha-3:N',
+#     tooltip=[
+#         alt.Tooltip('Country:N'),
+#         alt.Tooltip('Indicator:N'),
+#         alt.Tooltip('Value:Q')
+#     ]
+# ).add_params(
+#     country_selection,
+#     brush_selection
+# ).transform_filter(
+#     continent_selection
+# ).properties(
+#     width=900,
+#     height=540,
+#     title='Health Indicators in Countries'
+# )
