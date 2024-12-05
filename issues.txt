@@ -1,25 +1,4 @@
-1. Clicking on the bar charts is making the program think that it has selected a country but 
-    actually it hasnt and then makes all the points light in colour
-
-2. Continent legend get big in size while hovering over the bars and doesn't return to normal size then after
-
-3. PCP minmax issue
-
-4. alt.Title in the choropleth not working : https://altair-viz.github.io/user_guide/customization.html#adjusting-the-title
-
-5. Remove margin in the statistic display table
-
-6. how to use custom colour scheme
-
-7. I used colorbrewer for colour schemes but I am not satisfied with it. I am unable to find suitable colours that are also colourblind and print friendly.
-
-8. brish selection if it touchesd the continent bars, it ends up selecting countries in that range too
-
-9. dynamically changing size with country selection is not working
-
-10, Should i remmove life expectancy from the PCP?
-
-11. can i have the notebook and python file in the folder? what about the extra dataset and the geojson files folder too?
+1. remove margin, too much redundant space
 
 # health_indicators = [
 #     'Physicians per thousand',
