@@ -1,0 +1,6 @@
+pandas
+altair
+jupyter
+notebook
+numpy
+vega_datasets

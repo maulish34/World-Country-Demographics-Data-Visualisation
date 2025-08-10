@@ -65,7 +65,7 @@ country_shapes = gpd.read_file(url)
 country_shapes = country_shapes[['NAME', 'ISO_A3', 'geometry']]
 country_shapes['alpha-3'] = country_shapes['ISO_A3']
 
-# adding missing alpha-3 codes
+# adding missing or unmatched alpha-3 codes
 country_shapes.loc[country_shapes['NAME'] == 'Norway', 'alpha-3'] = 'NOR'
 country_shapes.loc[country_shapes['NAME'] == 'France', 'alpha-3'] = 'FRA'
 country_shapes.loc[country_shapes['NAME'] == 'Kosovo', 'alpha-3'] = 'XKX'
@@ -78,22 +78,14 @@ print(country_shapes.columns)
 
 map_data = pd.merge(country_shapes, df, on='alpha-3', how='left')
 
-# Initialize highlight column
 map_data['highlight'] = False
 df['highlight'] = False
 
 # Selection box for indicators
 selection_columns = ['GDP per Capita', 'Life expectancy', 'CO2 Emissions per Capita', 'Unemployment rate']
-selection_box = alt.binding_select(options=selection_columns, labels=['GDP per Capita (in USD)', 'Life expectancy (years)', 'CO2 Emissions per Capita (tonnes)', 'Unemployment rate (% of labour force)'], name='Select an Indicator')
+selection_box = alt.binding_select(options=selection_columns, labels=['GDP per Capita (in USD)', 'Life expectancy (years)', 'CO2 Emissions per Capita (tonnes)', 'Unemployment rate (% of labour force)'], name='Select an Indicator to display on map: ')
 selection = alt.selection_point(fields=['Indicator'], bind=selection_box, value='GDP per Capita')
 
-# Dropdown widget for indicator selection
-dropdown = widgets.Dropdown(
-    options=selection_columns,
-    value='GDP per Capita',
-    description='Select Indicator:',
-    style={'description_width': 'initial'}
-)
 
 # Choropleth map
 choropleth_map = alt.Chart(map_data, 
@@ -272,7 +264,7 @@ parallel_plot = alt.Chart(df_health,
     ]
 ).add_params(
     country_selection,
-    brush_selection
+    # brush_selection
 ).transform_filter(
     continent_selection
 ).properties(
@@ -372,18 +364,19 @@ selected_data = alt.Chart(df,
 
 # Combine charts into dashboard
 top_row = alt.hconcat(
-    final_map.properties(width=670, height=400),
-    parallel_plot.properties(width=710, height=400),
-    selected_data.properties(width=120, height=400)
+    final_map.properties(width=670, height=395),
+    selected_data.properties(width=120, height=395),
+    parallel_plot.properties(width=710, height=395),
+    # selected_data.properties(width=120, height=395)
 ).resolve_scale(
     color='independent'
 )
 
 bottom_row = alt.hconcat(
     legend.properties(width=80, height=250),
-    education_unemployment_chart.properties(width=500, height=380),
-    emissions_chart.properties(width=500, height=380),
-    gdp_life_expectancy_scatter.properties(width=500, height=380)    
+    education_unemployment_chart.properties(width=500, height=365),
+    emissions_chart.properties(width=500, height=365),
+    gdp_life_expectancy_scatter.properties(width=500, height=365)    
 ).resolve_scale(
     color='independent'
 )
@@ -392,11 +385,14 @@ dashboard = alt.vconcat(
     top_row,
     bottom_row
 ).properties(
-    title=alt.Title("Socio-Economic and Health Demographics Across Countries and Continents", subtitle="Select countries, continents, and ranges to filter data for comparision and exploration"),
+    title=alt.Title("Socio-Economic and Health Demographics Across Countries and Continents", 
+                    subtitle=["Use interactive features to filter data by continents or to highlight countries for comparision and exploration.", 
+                              "Select multiple countries and continents by holding down the `shift` key and clicking on them, click and drag to highlight a range of countries on any of the scatter plots.", 
+                              "All interactive features could be combined with each other to carry out detailed and more complex explorations."])
 ).configure_title(
     align='center',
     anchor='middle'
 )
 
 # Save dashboard to HTML
-dashboard.save('dashboard.html')
+dashboard.save('dashboard-1.html')

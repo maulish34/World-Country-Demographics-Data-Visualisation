@@ -1,4 +1,8 @@
 1. remove margin, too much redundant space
+2. Is this size okay?
+3. Which is better, stats in the middle or on the side, is it possible to put them on the far left?
+4. Is it okay to displat the stats table labels in this way?
+
 
 # health_indicators = [
 #     'Physicians per thousand',
